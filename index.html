@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AstroEscape Room AI - Stasiun ASTRA-9</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <style>
+    :root {
+      --neon-cyan: #00f0ff;
+      --neon-green: #00ff88;
+      --neon-red: #ff3366;
+      --neon-yellow: #f59e0b;
+      --neon-purple: #a855f7;
+      --bg-dark: #030712;
+      --panel-bg: rgba(15, 23, 42, 0.88);
+      --panel-border: rgba(0, 240, 255, 0.4);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Rajdhani', sans-serif; }
+    h1, h2, h3, h4, .cyber-font { font-family: 'Orbitron', sans-serif; }
+
+    body {
+      background-color: var(--bg-dark);
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow-x: hidden;
+      padding: 15px;
+      position: relative;
+    }
+
+    /* BACKGROUND VIDEO & CANVAS FALLBACK */
+    .bg-video-frame {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      z-index: 0; pointer-events: none; border: none; overflow: hidden; opacity: 0.5;
+    }
+    .bg-video-frame video {
+      width: 100%; height: 100%; object-fit: cover; pointer-events: none;
+    }
+    #starfield-canvas {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      z-index: 0; pointer-events: none; opacity: 0.6;
+    }
+
+    #splash-screen {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      z-index: 9000; background: #000; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; cursor: pointer; overflow: hidden;
+    }
+    #splash-screen video {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      border: none; pointer-events: none; object-fit: cover; opacity: 0.7;
+    }
+    .splash-overlay {
+      position: relative; z-index: 9001; text-align: center;
+      background: rgba(3, 7, 18, 0.85); padding: 30px 40px; border-radius: 16px;
+      border: 2px solid var(--neon-cyan); box-shadow: 0 0 30px rgba(0,240,255,0.5);
+      animation: pulseGlow 1.8s infinite alternate; backdrop-filter: blur(8px);
+    }
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 15px rgba(0,240,255,0.4); border-color: var(--neon-cyan); }
+      100% { box-shadow: 0 0 40px rgba(0,240,255,0.9); border-color: var(--neon-purple); }
+    }
+
+    #emergency-overlay {
+      position: fixed; top:0; left:0; width:100vw; height:100vh;
+      background: rgba(255, 0, 0, 0.35);
+      z-index: 999; pointer-events: none; opacity: 0; transition: opacity 0.3s;
+    }
+    .alarm-active { animation: blinkRed 0.6s infinite alternate; }
+    @keyframes blinkRed { 0% { opacity: 0; } 100% { opacity: 1; } }
+
+    .global-hud {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; background: rgba(2, 6, 23, 0.95); border-bottom: 2px solid var(--neon-cyan);
+      padding: 12px 18px; border-radius: 16px 16px 0 0; gap: 10px; flex-wrap: wrap;
+    }
+
+    .radar-box {
+      position: relative; width: 42px; height: 42px; border-radius: 50%;
+      border: 2px solid var(--neon-cyan); background: radial-gradient(circle, rgba(0,240,255,0.2) 0%, rgba(3,7,18,0.9) 80%);
+      box-shadow: 0 0 10px rgba(0,240,255,0.4); overflow: hidden; flex-shrink: 0;
+    }
+    .radar-sweep {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%;
+      background: conic-gradient(from 0deg, transparent 0deg, transparent 280deg, rgba(0,240,255,0.8) 360deg);
+      animation: radarScan 2s linear infinite;
+    }
+    @keyframes radarScan { 100% { transform: rotate(360deg); } }
+    .radar-blip {
+      position: absolute; top: 30%; left: 60%; width: 6px; height: 6px;
+      background: var(--neon-green); border-radius: 50%; box-shadow: 0 0 8px var(--neon-green);
+      animation: blip 1s infinite alternate;
+    }
+    @keyframes blip { 0% { opacity: 0.2; } 100% { opacity: 1; } }
+
+    .audio-controls {
+      display: flex; align-items: center; gap: 8px; background: rgba(15,23,42,0.8);
+      padding: 4px 12px; border-radius: 20px; border: 1px solid rgba(0,240,255,0.3);
+    }
+    .audio-btn { background: none; border: none; color: var(--neon-cyan); font-size: 16px; cursor: pointer; }
+    .volume-slider { width: 60px; accent-color: var(--neon-cyan); cursor: pointer; }
+
+    .spectrum-box {
+      display: flex; align-items: flex-end; gap: 3px; height: 20px; padding: 2px 4px;
+      background: rgba(2, 6, 23, 0.9); border: 1px solid rgba(0, 240, 255, 0.4); border-radius: 6px;
+    }
+    .s-bar {
+      width: 3px; background: var(--neon-cyan); border-radius: 2px;
+      animation: waveBar 0.8s ease-in-out infinite alternate;
+    }
+    @keyframes waveBar {
+      0% { height: 20%; background: var(--neon-cyan); }
+      50% { height: 100%; background: var(--neon-purple); }
+      100% { height: 40%; background: var(--neon-green); }
+    }
+    .s-bar:nth-child(1){animation-delay:0.1s} .s-bar:nth-child(2){animation-delay:0.3s}
+    .s-bar:nth-child(3){animation-delay:0.5s} .s-bar:nth-child(4){animation-delay:0.2s}
+
+    .widget-bar {
+      display: flex; gap: 12px; margin-bottom: 12px; align-items: center; background: rgba(2,6,23,0.7);
+      padding: 8px 12px; border-radius: 12px; border: 1px solid rgba(0,240,255,0.2); flex-wrap: wrap;
+    }
+    .widget-btn {
+      background: rgba(15,23,42,0.9); border: 1px solid var(--neon-cyan); color: #fff;
+      padding: 6px 12px; border-radius: 10px; font-weight: 700; font-size: 13px;
+      cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;
+    }
+    .widget-btn:hover { background: var(--neon-cyan); color: #020617; transform: translateY(-2px); box-shadow: 0 0 10px var(--neon-cyan);}
+    .widget-btn.active-chip { background: var(--neon-purple); border-color: #fff; box-shadow: 0 0 10px var(--neon-purple); }
+
+    .game-window {
+      position: relative; z-index: 10; width: 100%; max-width: 950px;
+      background: var(--panel-bg); border: 2px solid var(--panel-border); border-radius: 20px;
+      box-shadow: 0 0 40px rgba(0, 240, 255, 0.25); backdrop-filter: blur(12px);
+      overflow: hidden; display: flex; flex-direction: column; min-height: 650px;
+    }
+
+    .main-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; flex: 1; overflow-y: auto; }
+
+    .btn-action {
+      background: linear-gradient(135deg, var(--neon-cyan), #00a8ff); color: #020617;
+      border: none; padding: 12px 22px; font-weight: 900; font-size: 14px; border-radius: 10px;
+      cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.4); display: inline-flex; align-items: center; gap: 8px; justify-content: center;
+    }
+    .btn-action:hover { transform: scale(1.02); box-shadow: 0 0 25px rgba(0, 240, 255, 0.7); }
+    .btn-next { background: linear-gradient(135deg, var(--neon-green), #059669); color: #020617; }
+    .btn-exit { background: linear-gradient(135deg, var(--neon-red), #b91c1c); color: #fff; }
+
+    .feedback-banner {
+      padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 14px;
+      display: none; align-items: center; gap: 10px; margin-top: 10px;
+      animation: fadeIn 0.3s;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    .feedback-correct { background: rgba(0, 255, 136, 0.15); border: 1px solid var(--neon-green); color: var(--neon-green); display: flex; }
+    .feedback-wrong { background: rgba(255, 51, 102, 0.15); border: 1px solid var(--neon-red); color: var(--neon-red); display: flex; }
+
+    /* Teka Teki Silang Grid */
+    .tts-container { display: flex; gap: 20px; flex-wrap: wrap; }
+    .tts-grid { display: grid; grid-template-columns: repeat(7, 36px); gap: 4px; background: rgba(2,6,23,0.9); padding: 10px; border-radius: 10px; border: 1px solid var(--neon-cyan); width: max-content; }
+    .tts-cell { width: 36px; height: 36px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(0, 240, 255, 0.4); text-align: center; color: #fff; font-weight: 800; text-transform: uppercase; font-size: 16px; border-radius: 4px; outline: none; }
+    .tts-cell:focus { border-color: var(--neon-green); box-shadow: 0 0 8px var(--neon-green); }
+    .tts-cell.blocked { background: #020617; border-color: transparent; pointer-events: none; }
+    .tts-clues { flex: 1; min-width: 250px; font-size: 13px; line-height: 1.6; }
+
+    .chip-group { display: flex; flex-wrap: wrap; gap: 10px; }
+    .chip { background: rgba(15,23,42,0.8); border: 1px solid rgba(0,240,255,0.4); padding: 8px 14px; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; user-select: none; }
+    .chip.selected { background: var(--neon-purple); border-color: #fff; color: #fff; box-shadow: 0 0 12px var(--neon-purple); }
+
+    .sim-viewport { background: #020617; border: 1px solid var(--neon-cyan); height: 130px; border-radius: 12px; position: relative; display: flex; align-items: center; justify-content: space-around; overflow: hidden; padding: 10px; }
+    .sim-slot { width: 80px; height: 80px; border: 2px dashed rgba(0,240,255,0.4); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 40px; cursor: pointer; transition: all 0.2s; user-select: none; background: rgba(15,23,42,0.6); }
+    .sim-slot:hover { background: rgba(0,240,255,0.15); border-style: solid; border-color: var(--neon-cyan); }
+
+    .form-input {
+      background: rgba(2, 6, 23, 0.8); border: 1px solid var(--neon-cyan); color: #fff; padding: 10px 15px; border-radius: 8px; outline: none; font-size: 16px; width: 100%; max-width: 320px; transition: 0.3s;
+    }
+    .form-input:focus { box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); border-color: var(--neon-green); }
+
+    .heart-container {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+      background: rgba(2, 6, 23, 0.7);
+      padding: 4px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 51, 102, 0.4);
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .heart-icon { transition: all 0.3s ease; }
+    .heart-icon.lost { opacity: 0.2; filter: grayscale(100%); transform: scale(0.8); }
+
+    .tts-cell-wrapper {
+      position: relative;
+      width: 36px;
+      height: 36px;
+    }
+    .tts-cell-num {
+      position: absolute;
+      top: 1px;
+      left: 3px;
+      font-size: 9px;
+      font-weight: 800;
+      color: var(--neon-yellow);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .medal-badge {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      margin: 0 auto 15px auto;
+      font-size: 58px;
+      border: 4px solid;
+      box-shadow: 0 0 35px currentColor;
+      animation: pulseMedal 2s infinite alternate ease-in-out;
+    }
+    @keyframes pulseMedal {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.08); }
+    }
+
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(2, 6, 23, 0.88); backdrop-filter: blur(8px); z-index: 1000;
+      display: none; justify-content: center; align-items: center; padding: 20px;
+    }
+    .modal-card {
+      background: rgba(15, 23, 42, 0.95); border: 2px solid var(--neon-cyan);
+      border-radius: 16px; width: 100%; max-width: 700px; padding: 20px; display: flex; flex-direction: column; gap: 12px;
+      box-shadow: 0 0 30px rgba(0, 240, 255, 0.3); max-height: 90vh; overflow-y: auto;
+    }
+    
+    .chat-box { height: 260px; overflow-y: auto; background: rgba(2, 6, 23, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .chat-msg { padding: 10px 14px; border-radius: 8px; max-width: 85%; font-size: 13px; line-height: 1.5; }
+    .chat-msg.ai { background: rgba(0, 240, 255, 0.12); border-left: 3px solid var(--neon-cyan); align-self: flex-start; }
+    .chat-msg.user { background: rgba(168, 85, 247, 0.25); border-right: 3px solid var(--neon-purple); align-self: flex-end; }
+
+    #end-screen {
+      position: fixed; top:0; left:0; width:100vw; height:100vh; background: #000; z-index: 9999;
+      display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="starfield-canvas"></canvas>
+
+<audio id="bg-music" loop>
+  <source src="https://i.imgur.com/AuhQg2G.mp4" type="audio/mp4">
+</audio>
+<audio id="alarm-1430-audio">
+  <source src="https://i.imgur.com/QoPxfBM.mp4" type="audio/mp4">
+</audio>
+
+<div id="intro-screen" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 10000; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden;">
+  <video id="intro-video-auto" src="https://i.imgur.com/14p1Coi.mp4" playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+  <button id="skip-intro-btn" class="btn-action" style="position: absolute; bottom: 30px; right: 30px; z-index: 10001; opacity: 0.8;" onclick="skipIntro()">LEWATI INTRO ⏭️</button>
+</div>
+
+<div id="splash-screen" onclick="startIntro()" style="display: flex;">
+  <video id="intro-video" src="https://i.imgur.com/RuTQbws.mp4" autoplay loop muted playsinline></video>
+  <div class="splash-overlay">
+    <h1 class="cyber-font" style="color: var(--neon-cyan); font-size: 32px; margin-bottom: 10px;">🚀 STASIUN ASTRA-9</h1>
+    <p style="color: #e2e8f0; font-size: 16px; margin-bottom: 15px;">INISIALISASI SISTEM & PEMUTARAN INTRO...</p>
+    <button class="btn-action">▶️ MASUK STASIUN</button>
+  </div>
+</div>
+
+<div class="bg-video-frame" id="main-bg-video" style="display:none;">
+  <video id="bg-video-element" src="https://i.imgur.com/RuTQbws.mp4" autoplay loop muted playsinline></video>
+</div>
+
+<div id="emergency-overlay"></div>
+
+<div id="end-screen">
+  <div id="end-content" style="max-width: 650px; background: rgba(15,23,42,0.92); padding: 30px; border-radius: 20px; border: 2px solid var(--neon-cyan); box-shadow: 0 0 50px rgba(0,240,255,0.4);">
+    <div id="end-video-container" style="display:none; margin-bottom:15px; border-radius:12px; overflow:hidden; border:2px solid var(--neon-green);">
+      <video id="success-video" src="https://i.imgur.com/8hShx4n.mp4" loop playsinline style="width:100%; height:240px; object-fit:cover; display:block;"></video>
+    </div>
+    <h1 class="cyber-font" id="end-title" style="font-size: 32px; margin-bottom: 10px;"></h1>
+    <h2 class="cyber-font" id="end-subtitle" style="font-size: 18px; color: #94a3b8; margin-bottom: 15px;"></h2>
+    <p id="end-desc" style="font-size: 15px; line-height: 1.6; margin-bottom: 25px;"></p>
+    <button class="btn-action" onclick="resetToLobby()">🔄 KEMBALI KE LOBBY</button>
+  </div>
+</div>
+
+<div class="game-window" id="game-window" style="display:none;">
+  <div class="global-hud">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div class="radar-box"><div class="radar-sweep"></div><div class="radar-blip"></div></div>
+      <div>
+        <h3 class="cyber-font" id="hud-page-title" style="font-size: 14px; color: var(--neon-cyan);">HALAMAN 1</h3>
+        <p id="hud-room-sub" style="font-size: 11px; color: #94a3b8;">Lobby Ruang Kontrol Utama</p>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <div class="audio-controls">
+        <button class="audio-btn" id="music-toggle-btn" onclick="toggleMusic()">🔊</button>
+        <input type="range" class="volume-slider" id="volume-slider" min="0" max="1" step="0.05" value="0.5" oninput="changeVolume(this.value)">
+      </div>
+
+      <div class="spectrum-box">
+        <div class="s-bar"></div><div class="s-bar"></div><div class="s-bar"></div><div class="s-bar"></div>
+      </div>
+
+      <div style="background: rgba(2,6,23,0.8); border: 1px solid var(--neon-yellow); padding: 4px 10px; border-radius: 6px; font-weight: 700; color: var(--neon-yellow); font-size: 12px; min-width: 70px; text-align: center;">
+        ⏱️ <span id="timer-display">00:00</span>
+      </div>
+
+      <button class="btn-action" onclick="openAIChat()" style="padding: 6px 12px; font-size: 11px; background: var(--neon-purple); color: #fff;">
+        🤖 AstroAI
+      </button>
+    </div>
+  </div>
+
+  <div class="main-body" id="main-content">
+    <!-- KONTEN DI-RENDER MELALUI JS -->
+  </div>
+</div>
+
+<!-- MODAL BUKU KUNO -->
+<div class="modal-overlay" id="book-modal">
+  <div class="modal-card" style="max-width: 900px; height: 85vh;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+      <h3 class="cyber-font" style="color: var(--neon-cyan);">📖 BUKU KUNO - Menjelajah Tata Surya</h3>
+      <button onclick="closeBookModal()" style="background:none; border:none; color:#fff; font-size: 20px; cursor:pointer;">✕</button>
+    </div>
+    <div style="width: 100%; flex: 1; min-height: 420px; border-radius: 8px; overflow: hidden; background: #020617; border: 1px solid var(--neon-cyan);">
+      <iframe src="https://docs.google.com/presentation/d/1QOumD3F8xToJyiapbolANb89a9s_N8cv/embed?start=false&loop=false&delayms=3000" frameborder="0" width="100%" height="100%" allowfullscreen="true" mozallowfullscreen="true" webkitallowfullscreen="true" style="width:100%; height:100%; border:none;"></iframe>
+    </div>
+    <button class="btn-action" onclick="closeBookModal()" style="align-self: flex-end; padding: 8px 16px;">TUTUP MATERI</button>
+  </div>
+</div>
+
+<!-- MODAL PETA GALAKSI -->
+<div class="modal-overlay" id="galaxy-modal">
+  <div class="modal-card" style="border-color: var(--neon-green);">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+      <h3 class="cyber-font" style="color: var(--neon-green);">🌌 PETA GALAKSI - PETUNJUK PENGERJAAN</h3>
+      <button onclick="closeGalaxyModal()" style="background:none; border:none; color:#fff; font-size: 20px; cursor:pointer;">✕</button>
+    </div>
+    <div id="galaxy-guide-content" style="font-size: 14px; line-height: 1.6; color: #e2e8f0; padding: 10px 0;">
+      <!-- Dynamic Guide Content -->
+    </div>
+    <button class="btn-action" onclick="closeGalaxyModal()" style="align-self: flex-end; padding: 8px 16px; background: linear-gradient(135deg, var(--neon-green), #059669);">SIAP, MENGERTI</button>
+  </div>
+</div>
+
+<!-- MODAL AstroAI -->
+<div class="modal-overlay" id="ai-modal">
+  <div class="modal-card" style="border-color: var(--neon-purple);">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+      <h3 class="cyber-font" style="color: var(--neon-purple);">🤖 AstroAI - ASISTEN NAVIGASI</h3>
+      <button onclick="closeAIChat()" style="background:none; border:none; color:#fff; font-size: 20px; cursor:pointer;">✕</button>
+    </div>
+    <div class="chat-box" id="chat-box">
+      <div class="chat-msg ai">
+        <b>AstroAI:</b> Salam Astronaut! Saya AstroAI, asisten kecerdasan buatan stasiun luar angkasa ini. Ada konsep atau instruksi sains yang ingin kamu telusuri bersama?
+      </div>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <input type="text" id="ai-input" style="flex:1; background:rgba(2,6,23,0.9); border:1px solid var(--neon-purple); padding:10px; color:#fff; border-radius:8px; outline:none;" placeholder="Ketik pertanyaan atau minta petunjuk..." onkeydown="if(event.key==='Enter') sendAIMessage()">
+      <button class="btn-action" style="background:var(--neon-purple); border: none; color: #fff;" onclick="sendAIMessage()">KIRIM</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="lockout-modal" style="z-index: 11000; background: rgba(3,7,18,0.92);">
+  <div style="background: rgba(15,23,42,0.95); border: 2px solid var(--neon-red); border-radius: 20px; padding: 30px; text-align: center; max-width: 420px; box-shadow: 0 0 40px var(--neon-red);">
+    <div style="font-size: 54px; margin-bottom: 10px;">🔒</div>
+    <h3 class="cyber-font" style="color: var(--neon-red); font-size: 22px; margin-bottom: 8px;">SISTEM TERKUNCI!</h3>
+    <p style="color: #cbd5e1; font-size: 14px; margin-bottom: 15px;">3 Kesempatan (Hati) telah habis. Mengisi ulang daya hati dalam:</p>
+    <div id="lockout-countdown" class="cyber-font" style="font-size: 52px; color: var(--neon-yellow); font-weight: 900; text-shadow: 0 0 15px var(--neon-yellow);">3</div>
+  </div>
+</div>
+
+<script>
+  let currentPage = 1;
+  let secondsElapsed = 0;
+  let timerInterval = null;
+  let playerName = "";
+  let isEmergencyAlert = false;
+  let isMusicPlaying = false;
+  
+  let questionLives = {
+    '2_1': 3,
+    '2_2': 3,
+    '2_3': 3,
+    'tts': 3,
+    '4_1': 3,
+    '4_2': 3,
+    '4_3': 3,
+    'final': 3
+  };
+  let isLockedOut = false;
+
+  // Player Progress tracking to unlock progression buttons
+  let progress = {
+    p2_q1: false,
+    p2_q2: false,
+    p2_q3: false,
+    p3_tts: false,
+    p4_q1: false,
+    p4_q2: false,
+    p4_q3: false
+  };
+
+  let simObjects = ['🌍', '☀️', '🌕'];
+  const simIcons = ['☀️', '🌕', '🌍'];
+
+  // Crossword Grid Key (8 Rows x 7 Columns)
+  // Across: ROTASI (Row 0, Col 0..5), BUMI (Row 2, Col 1..4), SATELIT (Row 6, Col 0..6)
+  // Down: REVOLUSI (Row 0..7, Col 0), ATMOSFER (Row 0..7, Col 3)
+  const ttsAnswers = {
+    'c_0_0': 'R', 'c_0_1': 'O', 'c_0_2': 'T', 'c_0_3': 'A', 'c_0_4': 'S', 'c_0_5': 'I',
+    'c_1_0': 'E', 'c_1_3': 'T',
+    'c_2_0': 'V', 'c_2_1': 'B', 'c_2_2': 'U', 'c_2_3': 'M', 'c_2_4': 'I',
+    'c_3_0': 'O', 'c_3_3': 'O',
+    'c_4_0': 'L', 'c_4_3': 'S',
+    'c_5_0': 'U', 'c_5_3': 'F',
+    'c_6_0': 'S', 'c_6_1': 'A', 'c_6_2': 'T', 'c_6_3': 'E', 'c_6_4': 'L', 'c_6_5': 'I', 'c_6_6': 'T',
+    'c_7_0': 'I', 'c_7_3': 'R'
+  };
+
+  const ttsCellNumbers = {
+    'c_0_0': '1',
+    'c_0_3': '2',
+    'c_2_1': '3',
+    'c_6_0': '4'
+  };
+
+  function renderHearts(qId) {
+    const lives = questionLives[qId] !== undefined ? questionLives[qId] : 3;
+    let html = '<div class="heart-container" title="Kesempatan Menjawab">';
+    for(let i = 1; i <= 3; i++) {
+      if(i <= lives) {
+        html += '<span class="heart-icon">❤️</span>';
+      } else {
+        html += '<span class="heart-icon lost">🖤</span>';
+      }
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function handleWrongAttempt(qId, customResetCb) {
+    if (isLockedOut) return;
+    questionLives[qId]--;
+    
+    if (questionLives[qId] <= 0) {
+      triggerLockout(qId, customResetCb);
+    } else {
+      renderPage();
+    }
+  }
+
+  function triggerLockout(qId, customResetCb) {
+    isLockedOut = true;
+    const modal = document.getElementById('lockout-modal');
+    const countEl = document.getElementById('lockout-countdown');
+    if (!modal || !countEl) return;
+
+    modal.style.display = 'flex';
+    let count = 3;
+    countEl.innerText = count;
+
+    const interval = setInterval(() => {
+      count--;
+      if (count > 0) {
+        countEl.innerText = count;
+      } else {
+        clearInterval(interval);
+        questionLives[qId] = 3;
+        if (customResetCb) customResetCb();
+        modal.style.display = 'none';
+        isLockedOut = false;
+        renderPage();
+      }
+    }, 1000);
+  }
+
+  let audioCtx = null;
+  function playSoundNotification(isCorrect) {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (isCorrect) {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1); // A5
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.35);
+      } else {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime); // Low buzz
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.3);
+      }
+    } catch(e) {
+      console.log("Audio notification error:", e);
+    }
+  }
+
+  function playMusic() {
+    const music = document.getElementById('bg-music');
+    if (music) {
+      music.play().then(() => {
+        isMusicPlaying = true;
+        const btn = document.getElementById('music-toggle-btn');
+        if (btn) btn.innerText = '🔊';
+      }).catch(e => console.log("Music play blocked or failed:", e));
+    }
+  }
+
+  function toggleMusic() {
+    const music = document.getElementById('bg-music');
+    const btn = document.getElementById('music-toggle-btn');
+    if (!music) return;
+    if (isMusicPlaying) {
+      music.pause();
+      isMusicPlaying = false;
+      if (btn) btn.innerText = '🔇';
+    } else {
+      music.play().then(() => {
+        isMusicPlaying = true;
+        if (btn) btn.innerText = '🔊';
+      }).catch(e => console.log(e));
+    }
+  }
+
+  function changeVolume(val) {
+    const music = document.getElementById('bg-music');
+    if (music) music.volume = val;
+  }
+
+  document.getElementById('intro-screen').style.display = 'none';
+
+  function startIntro() {
+    document.getElementById('splash-screen').style.display = 'none';
+    const introScreen = document.getElementById('intro-screen');
+    const introVideo = document.getElementById('intro-video-auto');
+    
+    introScreen.style.display = 'flex';
+    introVideo.play().catch(e => {
+        console.log("Intro video auto-play prevented. Skipping intro.", e);
+        skipIntro();
+    });
+
+    introVideo.onended = function() {
+        skipIntro();
+    };
+  }
+
+  function skipIntro() {
+    const introScreen = document.getElementById('intro-screen');
+    const introVideo = document.getElementById('intro-video-auto');
+    
+    introVideo.pause();
+    introScreen.style.display = 'none';
+    enterGame();
+  }
+
+  function enterGame() {
+    document.getElementById('main-bg-video').style.display = 'block';
+    document.getElementById('game-window').style.display = 'flex';
+    playMusic();
+    renderPage();
+  }
+
+  function startMission() {
+    const nameInput = document.getElementById('player-name-input');
+    if (nameInput && nameInput.value.trim() !== '') {
+      playerName = nameInput.value.trim();
+    } else {
+      playerName = "Astronaut X";
+    }
+    startGlobalTimer();
+    goToPage(2);
+  }
+
+  function startGlobalTimer() {
+    if (timerInterval) return;
+    timerInterval = setInterval(() => {
+      secondsElapsed++;
+      const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+      const secs = String(secondsElapsed % 60).padStart(2, '0');
+      const timerDisplay = document.getElementById('timer-display');
+      if (timerDisplay) timerDisplay.innerText = `${mins}:${secs}`;
+
+      // Alarm sound at 14:30 (870s)
+      if (secondsElapsed === 870) {
+        const alarmAudio = document.getElementById('alarm-1430-audio');
+        if (alarmAudio) {
+            alarmAudio.volume = 1.0;
+            alarmAudio.play().catch(e => console.log("Alarm sound error:", e));
+        }
+      }
+
+      // Visual warning at 14:00 (840s)
+      if (secondsElapsed >= 840 && !isEmergencyAlert) {
+        isEmergencyAlert = true;
+        const emergencyOverlay = document.getElementById('emergency-overlay');
+        if (emergencyOverlay) emergencyOverlay.classList.add('alarm-active');
+      }
+      // Failure at 15:00 (900s)
+      if (secondsElapsed >= 900) {
+        endGame(false, "Waktu evakuasi melebihi batas toleransi 15 menit. Oksigen terkuras habis.");
+      }
+    }, 1000);
+  }
+
+  function getWidgetBarHTML() {
+    return `
+      <div class="widget-bar">
+        <button class="widget-btn" onclick="openBookModal()">📖 BUKU KUNO</button>
+        <button class="widget-btn" onclick="openGalaxyModal()">🌌 PETA GALAKSI</button>
+        <button class="widget-btn" onclick="openAIChat()">🤖 AstroAI</button>
+      </div>
+    `;
+  }
+
+  function openBookModal() { document.getElementById('book-modal').style.display = 'flex'; }
+  function closeBookModal() { document.getElementById('book-modal').style.display = 'none'; }
+
+  function openGalaxyModal() {
+    const guide = document.getElementById('galaxy-guide-content');
+    if (guide) {
+      guide.innerHTML = `
+        <p><b>🕹️ CARA INTERAKSI & MENGERJAKAN SOAL:</b></p>
+        <ul style="padding-left: 20px; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+          <li><b>Halaman 2 (Pilihan Ganda & Kompleks):</b> Klik tombol opsi jawaban yang menurut Anda tepat. Untuk soal pilihan ganda kompleks, Anda bisa mengklik lebih dari satu kotak opsi (chip) hingga berubah warna, lalu tekan tombol 'Verifikasi Jawaban'.</li>
+          <li><b>Halaman 3 (Teka-Teki Silang):</b> Klik pada setiap kotak kosong di dalam grid, lalu ketikkan tepat satu huruf per kotak menggunakan keyboard Anda. Kotak yang gelap tidak bisa diisi. Jika semua kotak jawaban sudah terisi penuh, klik 'Periksa TTS'.</li>
+          <li><b>Halaman 4 (Input Teks & Interaksi Visual):</b> Untuk soal menyusun huruf acak, ketikkan hasil susunan akhir di kolom teks input yang disediakan. Untuk soal interaksi visual (menyusun urutan), klik berulang kali pada ikon di dalam kotak putus-putus untuk mengganti objeknya hingga urutannya sesuai.</li>
+          <li><b>Halaman 5 (Input Akhir):</b> Terdapat kolom isian teks dan kolom isian angka. Ketikkan jawaban yang diminta pada masing-masing kolom tersebut, lalu tekan tombol konfirmasi besar di bawahnya.</li>
+          <li style="color: var(--neon-yellow); margin-top: 4px; list-style-type: none; margin-left: -20px;"><i>*Catatan: Peta ini khusus panduan cara mengoperasikan panel soal. Untuk referensi materi jawaban, buka widget 'Buku Kuno'.</i></li>
+        </ul>
+      `;
+    }
+    document.getElementById('galaxy-modal').style.display = 'flex';
+  }
+  function closeGalaxyModal() { document.getElementById('galaxy-modal').style.display = 'none'; }
+
+  function openAIChat() { document.getElementById('ai-modal').style.display = 'flex'; }
+  function closeAIChat() { document.getElementById('ai-modal').style.display = 'none'; }
+
+  async function sendAIMessage() {
+    const inputEl = document.getElementById('ai-input');
+    const msg = inputEl.value.trim();
+    if(!msg) return;
+
+    const chatBox = document.getElementById('chat-box');
+    chatBox.innerHTML += `<div class="chat-msg user"><b>Anda:</b> ${msg}</div>`;
+    inputEl.value = "";
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    // Show thinking indicator
+    const thinkingId = 'ai-thinking-' + Date.now();
+    chatBox.innerHTML += `<div class="chat-msg ai" id="${thinkingId}"><b>AstroAI:</b> <i>Sedang memproses sinyal komunikasi...</i></div>`;
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    try {
+      // Call Gemini 3 Flash Preview API
+      const apiKey = ""; // Canvas runtime environment automatically provides the API key
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+      
+      const systemPrompt = "Kamu adalah AstroAI, asisten kecerdasan buatan stasiun ruang angkasa dalam permainan edukasi AstroEscape Room AI. Tugas utama kamu adalah mendampingi siswa kelas 7 SMP memecahkan teka-teki sains IPA.\n" +
+        "Aturan Operasional:\n" +
+        "1. JANGAN PERNAH memberikan jawaban langsung, angka kunci kode, atau solusi teka-teki kepada siswa.\n" +
+        "2. Berikan bantuan secara bertahap (hint) berupa analogi, konsep dasar sains, atau variabel kunci yang perlu diperhatikan.\n" +
+        "3. Akhiri setiap respons dengan 1 pertanyaan pemancing yang mendesak siswa untuk berpikir analitis.\n" +
+        "4. Jika siswa meminta jawaban secara langsung (misal: 'apa jawabannya?'), tolak dengan sopan dan alihkan mereka untuk menganalisis petunjuk yang ada.\n" +
+        "5. Gunakan nada bicara yang ramah, komunikatif, dan bertema antariksa.";
+
+      const payload = {
+        contents: [{ parts: [{ text: `Nama Astronaut: ${playerName || 'Astronaut'}. Pertanyaan: ${msg}` }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] }
+      };
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      const thinkingEl = document.getElementById(thinkingId);
+
+      if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+        const replyText = data.candidates[0].content.parts[0].text;
+        if (thinkingEl) thinkingEl.innerHTML = `<b>AstroAI:</b> ${replyText}`;
+      } else {
+        throw new Error("Respon API tidak valid");
+      }
+      playSoundNotification(true);
+    } catch(e) {
+      console.log("Gemini API Fallback trigger:", e);
+      // Fallback offline hint generator if network or API key is absent
+      const thinkingEl = document.getElementById(thinkingId);
+      let reply = "";
+      const lower = msg.toLowerCase();
+      
+      if(lower.includes("apa jawabannya") || lower.includes("jawaban") || lower.includes("kunci") || lower.includes("kasih tahu")) {
+        reply = `Sebagai asisten navigasi Stasiun ASTRA-9, saya tidak dapat memberikan jawaban langsung, Astronaut ${playerName}. Namun coba periksa lagi Buku Kuno di sistem navigasimu untuk menemukan petunjuk! Menurutmu, bagian materi mana yang berhubungan dengan masalah yang sedang kamu hadapi?`;
+      } else if(lower.includes("terbesar")) {
+        reply = "Coba bayangkan planet mana di sistem kita yang memiliki massa terbesar dan dikategorikan sebagai raksasa gas Jovian! Apakah kamu ingat ciri utama dari planet tersebut?";
+      } else if (lower.includes("terestrial") || lower.includes("batuan")) {
+        reply = "Planet terestrial adalah kelompok empat planet terdekat dengan Matahari yang tersusun atas batuan padat. Di antara kedelapan planet yang ada, empat mana sajakah yang terdekat dari orbit Matahari? Kamu bisa membuka buku kuno untuk menemukan jawaban.";
+      } else if (lower.includes("tts") || lower.includes("silang")) {
+        reply = "Setiap kata pada dekode ini mengacu pada istilah mendasar pergerakan benda langit dan atmosfernya. Istilah ilmiah apa yang menjelaskan perputaran planet pada porosnya sendiri?";
+      } else if (lower.includes("revolusi")) {
+        reply = "Revolusi terjadi ketika suatu planet mengelilingi pusat massanya yaitu Matahari. Dampak apakah yang terjadi pada pergantian waktu tahunan di Bumi akibat pergerakan ini? Kamu bisa membuka buku kuno untuk menemukan jawaban.";
+      } else if (lower.includes("gerhana")) {
+        reply = "Ingatlah urutan bayangan yang terbentuk saat benda langit menutupi cahaya Matahari. Benda langit mana yang berada di tengah-tengah saat terjadi gerhana Matahari? Kamu bisa membuka buku kuno untuk menemukan jawaban.";
+      } else {
+        reply = `Halo Astronaut ${playerName}! Sinyal transmisi kita terhubung dengan baik. Konsep IPA mana yang sedang ingin kamu analisis bersama AstroAI saat ini?`;
+      }
+      
+      if (thinkingEl) thinkingEl.innerHTML = `<b>AstroAI:</b> ${reply}`;
+      playSoundNotification(true);
+    }
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  function toggleChip(el) {
+    el.classList.toggle('selected');
+  }
+
+  function showFeedback(id, isCorrect, msg) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'feedback-banner ' + (isCorrect ? 'feedback-correct' : 'feedback-wrong');
+    el.innerText = (isCorrect ? '✅ ' : '❌ ') + msg;
+    el.style.display = 'flex';
+  }
+
+  function checkP2Completion() {
+    if (progress.p2_q1 && progress.p2_q2 && progress.p2_q3) {
+      const nextZone = document.getElementById('next-p2-zone');
+      if (nextZone) nextZone.style.display = 'block';
+    }
+  }
+
+  function checkP4Completion() {
+    if (progress.p4_q1 && progress.p4_q2 && progress.p4_q3) {
+      const nextZone = document.getElementById('next-p4-zone');
+      if (nextZone) nextZone.style.display = 'block';
+    }
+  }
+
+  function checkAnswer(qID, selected, correct, btnElement) {
+    if (isLockedOut) return;
+    const parent = btnElement.parentElement;
+    Array.from(parent.children).forEach(btn => {
+      if(btn.tagName.toLowerCase() === 'button') btn.style.boxShadow = 'none';
+    });
+    btnElement.style.boxShadow = '0 0 15px var(--neon-cyan)';
+
+    const isCorrect = (selected === correct);
+    playSoundNotification(isCorrect);
+
+    if(qID === '2_1') {
+      if(isCorrect) {
+        progress.p2_q1 = true;
+        showFeedback('fb-2-1', true, "Tepat! Yupiter adalah planet terbesar.");
+        checkP2Completion();
+      } else {
+        progress.p2_q1 = false;
+        showFeedback('fb-2-1', false, "Salah, Analisis ulang buku kuno.");
+        handleWrongAttempt('2_1');
+      }
+    } else if (qID === '2_3') {
+      if(isCorrect) {
+        progress.p2_q3 = true;
+        showFeedback('fb-2-3', true, "Benar. Matahari memancarkan cahaya sendiri (Bintang).");
+        checkP2Completion();
+      } else {
+        progress.p2_q3 = false;
+        showFeedback('fb-2-3', false, "Salah. Planet tidak memancarkan cahaya sendiri.");
+        handleWrongAttempt('2_3');
+      }
+    } else if (qID === '4_3') {
+      if(isCorrect) {
+        progress.p4_q3 = true;
+        showFeedback('fb-4-3', true, "Benar! Pergantian musim dan gerak semu tahunan adalah akibat revolusi bumi.");
+        checkP4Completion();
+      } else {
+        progress.p4_q3 = false;
+        showFeedback('fb-4-3', false, "Salah. Rotasi menyebabkan siang-malam.");
+        handleWrongAttempt('4_3');
+      }
+    }
+  }
+
+  function checkPGKompleksP2() {
+    if (isLockedOut) return;
+    const chipsContainer = document.getElementById('chips-p2');
+    if (!chipsContainer) return;
+    const chips = chipsContainer.children;
+    const selected = [];
+    for(let i=0; i<chips.length; i++) {
+      if(chips[i].classList.contains('selected')) selected.push(chips[i].getAttribute('data-val'));
+    }
+    
+    const correctAnswers = ['Merkurius', 'Venus', 'Mars'];
+    const isCorrect = selected.length === 3 && correctAnswers.every(v => selected.includes(v));
+    playSoundNotification(isCorrect);
+
+    if(isCorrect) {
+      progress.p2_q2 = true;
+      showFeedback('fb-2-2', true, "Sistem Navigasi Aktif! Pemahaman planet terestrial sangat baik.");
+      checkP2Completion();
+    } else {
+      progress.p2_q2 = false;
+      showFeedback('fb-2-2', false, "Sistem Error. Planet terestrial adalah planet batuan yang letaknya paling dekat dengan matahari.");
+      handleWrongAttempt('2_2');
+    }
+  }
+
+  function generateTTSGrid() {
+    let gridHTML = '';
+    // Grid 8 Rows (0-7), 7 Cols (0-6)
+    for(let r = 0; r < 8; r++) {
+      for(let c = 0; c < 7; c++) {
+        const id = `c_${r}_${c}`;
+        if(ttsAnswers[id]) {
+          const numLabel = ttsCellNumbers[id] ? `<span class="tts-cell-num">${ttsCellNumbers[id]}</span>` : '';
+          gridHTML += `
+            <div class="tts-cell-wrapper">
+              ${numLabel}
+              <input type="text" maxlength="1" class="tts-cell" id="${id}" autocomplete="off" oninput="autoAdvanceTTS('${id}', ${r}, ${c})" ${isLockedOut ? 'disabled' : ''}>
+            </div>`;
+        } else {
+          gridHTML += `<div class="tts-cell blocked"></div>`;
+        }
+      }
+    }
+    return gridHTML;
+  }
+
+  function autoAdvanceTTS(currentId, r, c) {
+    const el = document.getElementById(currentId);
+    if (el && el.value.length === 1) {
+      // Try next right input, or down input
+      let nextEl = document.getElementById(`c_${r}_${c+1}`) || document.getElementById(`c_${r+1}_${c}`);
+      if (nextEl) nextEl.focus();
+    }
+  }
+
+  function checkTTS() {
+    if (isLockedOut) return;
+    let allCorrect = true;
+    for (const [id, char] of Object.entries(ttsAnswers)) {
+      const el = document.getElementById(id);
+      if(el) {
+        if(el.value.toUpperCase() !== char) {
+          allCorrect = false;
+          el.style.borderColor = 'var(--neon-red)';
+        } else {
+          el.style.borderColor = 'var(--neon-green)';
+        }
+      }
+    }
+    playSoundNotification(allCorrect);
+    if(allCorrect) {
+      progress.p3_tts = true;
+      showFeedback('fb-tts', true, "Sinyal Dekode Berhasil! Kode Frekuensi Reaktor Dikonfirmasi.");
+      document.getElementById('next-p3-zone').style.display = 'block';
+    } else {
+      progress.p3_tts = false;
+      showFeedback('fb-tts', false, "Sandi Dekode Tidak Cocok! Periksa kembali huruf pada kotak TTS.");
+      handleWrongAttempt('tts');
+    }
+  }
+
+  function checkAnagramP4() {
+    if (isLockedOut) return;
+    const val = document.getElementById('anagram-input').value.trim().toUpperCase();
+    const isCorrect = (val === 'REVOLUSI');
+    playSoundNotification(isCorrect);
+    if(isCorrect) {
+      progress.p4_q1 = true;
+      showFeedback('fb-4-1', true, "Benar! 'REVOLUSI' adalah gerakan planet mengelilingi Matahari.");
+      checkP4Completion();
+    } else {
+      progress.p4_q1 = false;
+      showFeedback('fb-4-1', false, "Salah! Petunjuk: Gerakan mengelilingi Matahari.");
+      handleWrongAttempt('4_1');
+    }
+  }
+
+  function cycleSlot(index) {
+    if (isLockedOut) return;
+    const current = simObjects[index];
+    const currIdx = simIcons.indexOf(current);
+    const nextIdx = (currIdx + 1) % simIcons.length;
+    simObjects[index] = simIcons[nextIdx];
+    
+    const slotEl = document.getElementById(`sim-slot-${index}`);
+    if(slotEl) slotEl.innerText = simObjects[index];
+  }
+
+  function checkEclipseSim() {
+    if (isLockedOut) return;
+    // Gerhana Matahari: Matahari - Bulan - Bumi (☀️ 🌕 🌍)
+    const isCorrect = (simObjects[0] === '☀️' && simObjects[1] === '🌕' && simObjects[2] === '🌍');
+    playSoundNotification(isCorrect);
+    if(isCorrect) {
+      progress.p4_q2 = true;
+      showFeedback('fb-4-2', true, "Simulasi Gerhana Matahari Tepat! (Matahari -> Bulan -> Bumi)");
+      checkP4Completion();
+    } else {
+      progress.p4_q2 = false;
+      showFeedback('fb-4-2', false, "Posisi Anomali! Gerhana Matahari terjadi jika Bulan berada di antara Matahari dan Bumi.");
+      handleWrongAttempt('4_2');
+    }
+  }
+
+  function submitFinalOverride() {
+    if (isLockedOut) return;
+    const planetAns = document.getElementById('final-planet-input').value.trim().toUpperCase();
+    const daysAns = document.getElementById('final-days-input').value.trim();
+
+    const isPlanetCorrect = (planetAns === 'YUPITER' || planetAns === 'JUPITER');
+    const isDaysCorrect = (daysAns === '365' || daysAns === '365.25' || daysAns === '366');
+
+    if (isPlanetCorrect && isDaysCorrect) {
+      playSoundNotification(true);
+      endGame(true, `Selamat Astronaut ${playerName}! Protokol Evakuasi Berhasil Diaktifkan. Seluruh sistem Stasiun ASTRA-9 pulih sepenuhnya!`);
+    } else {
+      playSoundNotification(false);
+      showFeedback('fb-final', false, "AKSES DITOLAK! Periksa nama planet terbesar dan jumlah hari revolusi Bumi.");
+      handleWrongAttempt('final');
+    }
+  }
+
+  function getMedalInfo(seconds) {
+    const mins = seconds / 60;
+    if (mins <= 5) {
+      return {
+        type: 'EMAS',
+        title: 'JENDRAL',
+        icon: '🥇',
+        color: '#ffd700',
+        bg: 'radial-gradient(circle, rgba(255,215,0,0.35) 0%, rgba(15,23,42,0.95) 75%)',
+        border: '#ffd700',
+        desc: 'PERFORMA TINGKAT BINTANG V! Anda menyelesaikan evaluasi navigasi dengan kecepatan dan ketepatan sempurna layaknya seorang Jendral!'
+      };
+    } else if (mins <= 9) {
+      return {
+        type: 'PERAK',
+        title: 'PERWIRA',
+        icon: '🥈',
+        color: '#e2e8f0',
+        bg: 'radial-gradient(circle, rgba(226,232,240,0.35) 0%, rgba(15,23,42,0.95) 75%)',
+        border: '#cbd5e1',
+        desc: 'SANGAT TANGGUH! Anda berhasil mengeksekusi protokol evakuasi dengan kecerdasan dan kepemimpinan taktis seorang Perwira.'
+      };
+    } else if (mins <= 12) {
+      return {
+        type: 'PERUNGGU',
+        title: 'BINTARA',
+        icon: '🥉',
+        color: '#cd7f32',
+        bg: 'radial-gradient(circle, rgba(205,127,50,0.35) 0%, rgba(15,23,42,0.95) 75%)',
+        border: '#cd7f32',
+        desc: 'EKSEKUSI MISI BERHASIL! Pengetahuan Tata Surya Anda berhasil menyelamatkan Stasiun ASTRA-9 tepat waktu.'
+      };
+    } else {
+      return {
+        type: 'KAYU',
+        title: 'CADET',
+        icon: '🪵',
+        color: '#d97706',
+        bg: 'radial-gradient(circle, rgba(217,119,6,0.35) 0%, rgba(15,23,42,0.95) 75%)',
+        border: '#d97706',
+        desc: 'MISI BERHASIL TERLAMPAUI! Anda membuktikan kegigihan seorang Cadet luar angkasa hingga detik-detik terakhir.'
+      };
+    }
+  }
+
+  function goToPage(page) {
+    currentPage = page;
+    renderPage();
+  }
+
+  function endGame(isSuccess, descText) {
+    if (timerInterval) clearInterval(timerInterval);
+    const bgMusic = document.getElementById('bg-music');
+    if (bgMusic) bgMusic.pause();
+
+    document.getElementById('game-window').style.display = 'none';
+    const endScreen = document.getElementById('end-screen');
+    endScreen.style.display = 'flex';
+
+    const endTitle = document.getElementById('end-title');
+    const endSub = document.getElementById('end-subtitle');
+    const endDesc = document.getElementById('end-desc');
+    const videoContainer = document.getElementById('end-video-container');
+    const successVideo = document.getElementById('success-video');
+
+    if (isSuccess) {
+      const medal = getMedalInfo(secondsElapsed);
+      const minsDisplay = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+      const secsDisplay = String(secondsElapsed % 60).padStart(2, '0');
+
+      endTitle.innerText = "🏆 MISI EVAKUASI SUKSES!";
+      endTitle.style.color = medal.color;
+      endSub.innerHTML = `SELESAI DALAM WAKTU <span style="color:var(--neon-yellow);">${minsDisplay}:${secsDisplay}</span>`;
+      
+      endDesc.innerHTML = `
+        <div class="medal-badge" style="background: ${medal.bg}; border-color: ${medal.border}; color: ${medal.color};">
+          ${medal.icon}
+        </div>
+        <div class="cyber-font" style="font-size: 26px; color: ${medal.color}; letter-spacing: 2px; margin-bottom: 6px;">
+          MEDALI ${medal.type} - GELAR: ${medal.title}
+        </div>
+        <p style="font-size: 14px; color: #cbd5e1; max-width: 520px; margin: 0 auto 15px auto; line-height: 1.5;">
+          ${medal.desc}
+        </p>
+      `;
+      if (videoContainer) videoContainer.style.display = 'block';
+      if (successVideo) {
+        successVideo.muted = false;
+        successVideo.currentTime = 0;
+        successVideo.play().catch(e => console.log("Video sound play error:", e));
+      }
+    } else {
+      endTitle.innerText = "⚠️ EVAKUASI GAGAL";
+      endTitle.style.color = "var(--neon-red)";
+      endSub.innerText = "KEHABISAN WAKTU & OKSIGEN";
+      endDesc.innerText = descText;
+      if (videoContainer) videoContainer.style.display = 'none';
+    }
+  }
+
+  function resetToLobby() {
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = null;
+    secondsElapsed = 0;
+    isEmergencyAlert = false;
+    isLockedOut = false;
+    
+    const successVideo = document.getElementById('success-video');
+    if (successVideo) {
+      successVideo.pause();
+      successVideo.muted = true;
+    }
+
+    questionLives = {
+      '2_1': 3, '2_2': 3, '2_3': 3,
+      'tts': 3,
+      '4_1': 3, '4_2': 3, '4_3': 3,
+      'final': 3
+    };
+
+    const emergencyOverlay = document.getElementById('emergency-overlay');
+    if (emergencyOverlay) emergencyOverlay.classList.remove('alarm-active');
+    
+    document.getElementById('timer-display').innerText = '00:00';
+    document.getElementById('end-screen').style.display = 'none';
+    
+    progress = {
+      p2_q1: false, p2_q2: false, p2_q3: false,
+      p3_tts: false, p4_q1: false, p4_q2: false, p4_q3: false
+    };
+    
+    goToPage(1);
+    document.getElementById('game-window').style.display = 'flex';
+  }
+
+  function renderPage() {
+    const main = document.getElementById('main-content');
+    const hudTitle = document.getElementById('hud-page-title');
+    const hudSub = document.getElementById('hud-room-sub');
+
+    if (currentPage === 1) {
+      hudTitle.innerText = "HALAMAN 1";
+      hudSub.innerText = "Lobby Ruang Kontrol Utama";
+      main.innerHTML = `
+        ${getWidgetBarHTML()}
+        <div style="background: rgba(2,6,23,0.8); border: 1px solid var(--neon-cyan); padding: 25px; border-radius: 16px; text-align: center;">
+          <h2 class="cyber-font" style="color: var(--neon-cyan); font-size: 24px; margin-bottom: 12px;">PANGGILAN DARURAT STASIUN ASTRA-9</h2>
+          <p style="font-size: 15px; color: #cbd5e1; line-height: 1.6; max-width: 700px; margin: 0 auto 20px auto;">
+            Peringatan! Terjadi badai radiasi matahari yang melumpuhkan sistem navigasi utama. Anda terjebak di dalam modul stasiun. Selesaikan serangkaian instruksi dan teka-teki materi <b>Tata Surya IPA Kelas 7</b> untuk memulihkan reaktor dan melakukan evakuasi dalam waktu maksimal <b>15 Menit</b>!
+          </p>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 15px; max-width: 350px; margin: 0 auto;">
+            <input type="text" id="player-name-input" class="form-input" placeholder="Masukkan Nama Astronaut..." value="${playerName}">
+            <button class="btn-action btn-next" onclick="startMission()" style="width: 100%;">🚀 MULAI MISI EVAKUASI</button>
+          </div>
+        </div>
+      `;
+    } 
+    else if (currentPage === 2) {
+      hudTitle.innerText = "HALAMAN 2";
+      hudSub.innerText = "Zona 1 - Laboratorium Astrofisika";
+      main.innerHTML = `
+        ${getWidgetBarHTML()}
+        <h3 class="cyber-font" style="color: var(--neon-cyan); font-size: 18px;">ZONA 1: INVENTARISASI SISTEM TATA SURYA</h3>
+        
+        <!-- Soal 1: Pilihan Ganda -->
+        <div style="background: rgba(2,6,23,0.7); border: 1px solid rgba(0,240,255,0.3); padding: 15px; border-radius: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <p style="font-size: 14px; font-weight: 700;">1. Planet manakah yang memiliki ukuran paling besar di Tata Surya kita?</p>
+            ${renderHearts('2_1')}
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="chip" onclick="checkAnswer('2_1', 'Mars', 'Yupiter', this)">Mars</button>
+            <button class="chip" onclick="checkAnswer('2_1', 'Bumi', 'Yupiter', this)">Bumi</button>
+            <button class="chip" onclick="checkAnswer('2_1', 'Yupiter', 'Yupiter', this)">Yupiter</button>
+            <button class="chip" onclick="checkAnswer('2_1', 'Saturnus', 'Yupiter', this)">Saturnus</button>
+          </div>
+          <div id="fb-2-1" class="feedback-banner"></div>
+        </div>
+
+        <!-- Soal 2: Pilihan Ganda Kompleks (Chips) -->
+        <div style="background: rgba(2,6,23,0.7); border: 1px solid rgba(0,240,255,0.3); padding: 15px; border-radius: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <p style="font-size: 14px; font-weight: 700;">2. Pilih SEMUA planet yang tergolong sebagai Planet Terestrial (Kebumian/Berbatu):</p>
+            ${renderHearts('2_2')}
+          </div>
+          <div class="chip-group" id="chips-p2" style="margin-bottom: 12px;">
+            <div class="chip" data-val="Merkurius" onclick="toggleChip(this)">Merkurius</div>
+            <div class="chip" data-val="Venus" onclick="toggleChip(this)">Venus</div>
+            <div class="chip" data-val="Mars" onclick="toggleChip(this)">Mars</div>
+            <div class="chip" data-val="Yupiter" onclick="toggleChip(this)">Yupiter</div>
+            <div class="chip" data-val="Neptunus" onclick="toggleChip(this)">Neptunus</div>
+          </div>
+          <button class="btn-action" style="padding: 6px 14px; font-size: 12px;" onclick="checkPGKompleksP2()">VERIFIKASI JAWABAN</button>
+          <div id="fb-2-2" class="feedback-banner"></div>
+        </div>
+
+        <!-- Soal 3: Pilihan Ganda -->
+        <div style="background: rgba(2,6,23,0.7); border: 1px solid rgba(0,240,255,0.3); padding: 15px; border-radius: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <p style="font-size: 14px; font-weight: 700;">3. Objek langit apa yang menjadi pusat gravitasi dan pemancar energi cahaya utama di Tata Surya?</p>
+            ${renderHearts('2_3')}
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="chip" onclick="checkAnswer('2_3', 'Bulan', 'Matahari', this)">Bulan</button>
+            <button class="chip" onclick="checkAnswer('2_3', 'Matahari', 'Matahari', this)">Matahari</button>
+            <button class="chip" onclick="checkAnswer('2_3', 'Komet Halley', 'Matahari', this)">Komet Halley</button>
+          </div>
+          <div id="fb-2-3" class="feedback-banner"></div>
+        </div>
+
+        <div id="next-p2-zone" style="display: ${progress.p2_q1 && progress.p2_q2 && progress.p2_q3 ? 'block' : 'none'}; text-align: right; margin-top: 10px;">
+          <button class="btn-action btn-next" onclick="goToPage(3)">LANJUT KE ZONA 2 ➔</button>
+        </div>
+      `;
+    }
+    else if (currentPage === 3) {
+      hudTitle.innerText = "HALAMAN 3";
+      hudSub.innerText = "Zona 2 - Ruang Dekode Radiasi";
+      main.innerHTML = `
+        ${getWidgetBarHTML()}
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h3 class="cyber-font" style="color: var(--neon-cyan); font-size: 18px;">ZONA 2: TEKA-TEKI SILANG KODE FREKUENSI</h3>
+          ${renderHearts('tts')}
+        </div>
+        <p style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Isi semua kotak kosong pada grid di bawah ini berdasarkan petunjuk mendatar dan menurun.</p>
+
+        <div class="tts-container" style="margin-top: 10px;">
+          <div class="tts-grid">
+            ${generateTTSGrid()}
+          </div>
+          <div class="tts-clues" style="background: rgba(2,6,23,0.8); border: 1px solid var(--neon-cyan); padding: 12px; border-radius: 10px;">
+            <h4 style="color: var(--neon-cyan);" class="cyber-font">MENDATAR:</h4>
+            <p><b>1. (Baris 1)</b> Gerakan planet berputar pada porosnya (6 Huruf).</p>
+            <p><b>3. (Baris 3)</b> Planet ketiga dari Matahari tempat tinggal makhluk hidup (4 Huruf).</p>
+            <p><b>4. (Baris 7)</b> Benda langit pengiring planet, contohnya Bulan (7 Huruf).</p>
+            <h4 style="color: var(--neon-green); margin-top: 10px;" class="cyber-font">MENURUN:</h4>
+            <p><b>1. (Kolom 1)</b> Gerakan planet mengelilingi Matahari (8 Huruf).</p>
+            <p><b>2. (Kolom 4)</b> Lapisan gas yang menyelimuti planet (8 Huruf).</p>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; align-items: center; margin-top: 15px;">
+          <button class="btn-action" onclick="checkTTS()">PERIKSA KUNCI DEKODE (TTS)</button>
+        </div>
+        <div id="fb-tts" class="feedback-banner"></div>
+
+        <div id="next-p3-zone" style="display: ${progress.p3_tts ? 'block' : 'none'}; text-align: right; margin-top: 10px;">
+          <button class="btn-action btn-next" onclick="goToPage(4)">LANJUT KE ZONA 3 ➔</button>
+        </div>
+      `;
+    }
+    else if (currentPage === 4) {
+      hudTitle.innerText = "HALAMAN 4";
+      hudSub.innerText = "Zona 3 - Ruang Simulasi Orbit";
+      main.innerHTML = `
+        ${getWidgetBarHTML()}
+        <h3 class="cyber-font" style="color: var(--neon-cyan); font-size: 18px;">ZONA 3: SIMULASI ANOMALI ORBIT & GERHANA</h3>
+
+        <!-- Soal 1: Anagram -->
+        <div style="background: rgba(2,6,23,0.7); border: 1px solid rgba(0,240,255,0.3); padding: 15px; border-radius: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <p style="font-size: 14px; font-weight: 700;">1. Susun ulang huruf acak berikut menjadi istilah lintasan planet mengelilingi Matahari: <span style="color: var(--neon-yellow); font-family: monospace;">S I L U V O R E</span></p>
+            ${renderHearts('4_1')}
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <input type="text" id="anagram-input" class="form-input" style="max-width: 220px;" placeholder="Ketik kata hasil susunan..." ${isLockedOut ? 'disabled' : ''}>
+            <button class="btn-action" style="padding: 6px 14px; font-size: 12px;" onclick="checkAnagramP4()">VERIFIKASI</button>
+          </div>
+          <div id="fb-4-1" class="feedback-banner"></div>
+        </div>
+
+        <!-- Soal 2: Interactive Slot Eclipse Simulation -->
+        <div style="background: rgba(2,6,23,0.7); border: 1px solid rgba(0,240,255,0.3); padding: 15px; border-radius: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <p style="font-size: 14px; font-weight: 700;">2. Atur posisi objek untuk mengaktifkan SIMULASI GERHANA MATAHARI (Klik ikon untuk mengganti):</p>
+            ${renderHearts('4_2')}
+          </div>
+          <div class="sim-viewport">
+            <div style="text-align: center;">
+              <div class="sim-slot" id="sim-slot-0" onclick="cycleSlot(0)">${simObjects[0]}</div>
+              <span style="font-size: 11px; color: #94a3b8;">Posisi 1</span>
+            </div>
+            <div style="font-size: 20px; color: var(--neon-cyan);">➔</div>
+            <div style="text-align: center;">
+              <div class="sim-slot" id="sim-slot-1" onclick="cycleSlot(1)">${simObjects[1]}</div>
+              <span style="font-size: 11px; color: #94a3b8;">Posisi 2</span>
+            </div>
+            <div style="font-size: 20px; color: var(--neon-cyan);">➔</div>
+            <div style="text-align: center;">
+              <div class="sim-slot" id="sim-slot-2" onclick="cycleSlot(2)">${simObjects[2]}</div>
+              <span style="font-size: 11px; color: #94a3b8;">Posisi 3</span>
+            </div>
+          </div>
+          <button class="btn-action" style="padding: 6px 14px; font-size: 12px; margin-top: 10px;" onclick="checkEclipseSim()">UJI SIMULASI GERHANA</button>
+          <div id="fb-4-2" class="feedback-banner"></div>
+        </div>
+
+        <!-- Soal 3: Pilihan Ganda -->
+        <div style="background: rgba(2,6,23,0.7); border: 1px solid rgba(0,240,255,0.3); padding: 15px; border-radius: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <p style="font-size: 14px; font-weight: 700;">3. Manakah fenomena yang diakibatkan oleh gerak REVOLUSI Bumi mengelilingi Matahari?</p>
+            ${renderHearts('4_3')}
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="chip" onclick="checkAnswer('4_3', 'A', 'B', this)">A. Pergantian Siang dan Malam</button>
+            <button class="chip" onclick="checkAnswer('4_3', 'B', 'B', this)">B. Perbedaan Musim & Gerak Semu Tahunan Matahari</button>
+            <button class="chip" onclick="checkAnswer('4_3', 'C', 'B', this)">C. Pembelokan Arus Laut (Efek Coriolis)</button>
+          </div>
+          <div id="fb-4-3" class="feedback-banner"></div>
+        </div>
+
+        <div id="next-p4-zone" style="display: ${progress.p4_q1 && progress.p4_q2 && progress.p4_q3 ? 'block' : 'none'}; text-align: right; margin-top: 10px;">
+          <button class="btn-action btn-next" onclick="goToPage(5)">LANJUT KE ZONA 4 (REAKTOR UTAMA) ➔</button>
+        </div>
+      `;
+    }
+    else if (currentPage === 5) {
+      hudTitle.innerText = "HALAMAN 5";
+      hudSub.innerText = "Zona 4 - Terminal Reaktor Utama";
+      main.innerHTML = `
+        ${getWidgetBarHTML()}
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h3 class="cyber-font" style="color: var(--neon-cyan); font-size: 18px;">ZONA 4: OVERRIDE SANDE REAKTOR DURA-CORE</h3>
+          ${renderHearts('final')}
+        </div>
+        <p style="font-size: 14px; color: #e2e8f0;">Masukkan kode verifikasi akhir untuk membuka kunci pintu evakuasi stasiun ASTRA-9:</p>
+
+        <div style="background: rgba(2,6,23,0.8); border: 1px solid var(--neon-purple); padding: 20px; border-radius: 12px; display: flex; flex-direction: column; gap: 15px;">
+          <div>
+            <label style="display: block; font-size: 13px; font-weight: 700; color: var(--neon-cyan); margin-bottom: 5px;">
+              🔑 SANDE 1: Sebutkan nama planet terbesar yang memiliki Bintik Merah Raksasa (Great Red Spot):
+            </label>
+            <input type="text" id="final-planet-input" class="form-input" placeholder="Masukkan jawaban..." ${isLockedOut ? 'disabled' : ''}>
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 13px; font-weight: 700; color: var(--neon-green); margin-bottom: 5px;">
+              🔑 SANDE 2: Berapa hari waktu yang dibutuhkan Bumi untuk melakukan 1 kali revolusi penuh mengelilingi Matahari?
+            </label>
+            <input type="number" id="final-days-input" class="form-input" placeholder="Masukkan angka..." ${isLockedOut ? 'disabled' : ''}>
+          </div>
+
+          <div id="fb-final" class="feedback-banner"></div>
+
+          <button class="btn-action btn-next" style="padding: 14px 28px; font-size: 16px; margin-top: 10px; width: 100%; justify-content: center;" onclick="submitFinalOverride()">
+            🔓 AKTIFKAN PROTOKOL EVAKUASI DURA-CORE
+          </button>
+        </div>
+      `;
+    }
+  }
+
+  window.onload = function() {
+    const canvas = document.getElementById('starfield-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    const stars = [];
+    for (let i = 0; i < 120; i++) {
+      stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        radius: Math.random() * 1.5,
+        alpha: Math.random(),
+        speed: Math.random() * 0.02 + 0.005
+      });
+    }
+
+    function animateStars() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      stars.forEach(star => {
+        star.alpha += star.speed;
+        if (star.alpha > 1 || star.alpha < 0) star.speed = -star.speed;
+        ctx.fillStyle = `rgba(0, 240, 255, ${Math.abs(star.alpha)})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      requestAnimationFrame(animateStars);
+    }
+    animateStars();
+  };
+</script>
+</body>
+</html>
